@@ -1,0 +1,9 @@
+// 每天凌晨执行一次
+Function ScheduledExpireCouponTask():
+    // 找出所有状态为未使用(0) 且 有效期小于当前时间的记录
+    expiredList = Query("SELECT * FROM user_coupon uc JOIN coupon_definition c ON uc.coupon_id = c.id WHERE uc.status = 0 AND c.end_time < now()")
+
+    FOR coupon IN expiredList:
+        UpdateUserCouponStatus(coupon.id, STATUS_EXPIRED) // 更新为已过期(2)
+    END FOR
+End Function

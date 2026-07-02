@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>优惠券管理</title>
+    <link rel="stylesheet" href="../../plugins/element-ui/index.css" />
+    <link rel="stylesheet" href="../../styles/common.css" />
+    <link rel="stylesheet" href="../../styles/page.css" />
+</head>
+<body>
+<div class="dashboard-container" id="coupon-app">
+    <div class="container">
+        <div class="tableBar">
+            <el-input
+                    v-model="input"
+                    placeholder="请输入优惠券名称"
+                    style="width: 250px"
+                    clearable
+                    @keyup.enter.native="handleQuery"
+            >
+                <i slot="prefix" class="el-input__icon el-icon-search" style="cursor: pointer" @click="handleQuery"></i>
+            </el-input>
+            <el-button type="primary" @click="handleAdd">+ 新增优惠券</el-button>
+        </div>
+
+        <el-table :data="tableData" stripe class="tableBox">
+            <el-table-column prop="name" label="优惠券名称"></el-table-column>
+            <el-table-column label="类型">
+                <template slot-scope="scope">
+                    <span>{{ scope.row.type === 1 ? '满减券' : '折扣券' }}</span>
+                </template>
+            </el-table-column>
+            <el-table-column prop="amount" label="面额/折扣"></el-table-column>
+            <el-table-column prop="minSpend" label="使用门槛"></el-table-column>
+            <el-table-column label="有效期">
+                <template slot-scope="scope">
+                    {{ scope.row.startTime }} 至 {{ scope.row.endTime }}
+                </template>
+            </el-table-column>
+            <el-table-column label="状态">
+                <template slot-scope="scope">
+                    <span>{{ scope.row.status === 1 ? '启用' : '禁用' }}</span>
+                </template>
+            </el-table-column>
+            <el-table-column label="操作" width="160" align="center">
+                <template slot-scope="scope">
+
+                    <el-button
+                            type="text"
+                            size="small"
+                            style="color: #E6A23C;"
+                            @click="handleDistribute(scope.row.id)">
+                        一键分发
+                    </el-button>
+
+                    <el-button
+                            type="text"
+                            size="small"
+                            :class="scope.row.status === 1 ? 'delBut non' : 'blueBug'"
+                            @click="handleStatus(scope.row)"
+                    >
+                        {{ scope.row.status === 1 ? '停用' : '启用' }}
+                    </el-button>
+
+
+                    <el-button type="text" size="small" class="blueBug" @click="handleEdit(scope.row)">修改</el-button>
+                    <el-button type="text" size="small" class="delBut non" @click="handleDelete(scope.row.id)">删除</el-button>
+                </template>
+            </el-table-column>
+        </el-table>
+
+        <el-pagination
+                class="pageList"
+                :page-sizes="[10, 20, 30, 40]"
+                :page-size="pageSize"
+                layout="total, sizes, prev, pager, next, jumper"
+                :total="counts"
+                @size-change="handleSizeChange"
+                @current-change="handleCurrentChange"
+        ></el-pagination>
+    </div>
+
+    <el-dialog :title="dialogTitle" :visible.sync="dialogVisible" width="40%" :before-close="handleClose">
+        <el-form :model="form" ref="form" :rules="rules" label-width="120px">
+
+            <el-form-item label="优惠券名称" prop="name">
+                <el-input v-model="form.name" placeholder="请输入名称"></el-input>
+            </el-form-item>
+
+            <el-form-item label="类型" prop="type">
+                <el-radio-group v-model="form.type">
+                    <el-radio :label="1">满减券</el-radio>
+                    <el-radio :label="2">无门槛券</el-radio>
+                </el-radio-group>
+            </el-form-item>
+
+            <el-form-item label="优惠金额" prop="amount">
+                <el-input v-model="form.amount" type="number" placeholder="请输入减免金额"></el-input>
+            </el-form-item>
+
+            <el-form-item label="最低消费" prop="minSpend" v-if="form.type === 1">
+                <el-input v-model="form.minSpend" type="number" placeholder="满多少可用"></el-input>
+            </el-form-item>
+
+            <el-form-item label="有效时间" prop="dateRange">
+                <el-date-picker
+                        v-model="form.dateRange"
+                        type="datetimerange"
+                        range-separator="至"
+                        start-placeholder="开始"
+                        end-placeholder="结束"
+                        value-format="yyyy-MM-dd HH:mm:ss"
+                        :style="{width: '380px'}"
+                >
+                </el-date-picker>
+            </el-form-item>
+
+        </el-form>
+        <span slot="footer" class="dialog-footer">
+    <el-button @click="dialogVisible = false">取 消</el-button>
+    <el-button type="primary" @click="submitForm">确 定</el-button>
+  </span>
+    </el-dialog>
+</div>
+
+<script src="../../plugins/vue/vue.js"></script>
+<script src="../../plugins/element-ui/index.js"></script>
+<script src="../../plugins/axios/axios.min.js"></script>
+<script src="../../js/request.js"></script>
+<script src="../../api/coupon.js"></script>
+<script>
+    new Vue({
+      el: '#coupon-app',
+      data() {
+        return {
+          input: '',
+          counts: 0,
+          page: 1,
+          pageSize: 10,
+          tableData: [],
+          dialogVisible: false,
+          dialogTitle: '新增优惠券',
+          form: {
+            name: '',
+            type: 1,
+            amount: '',
+            minSpend: '',
+            dateRange: [], // 用于绑定时间选择器
+            status: 1
+          },
+          rules: {
+            name: [{ required: true, message: '请输入名称', trigger: 'blur' }],
+            amount: [{ required: true, message: '请输入金额', trigger: 'blur' }],
+            minSpend: [{ required: true, message: '请输入门槛', trigger: 'blur' }],
+            dateRange: [{ required: true, message: '请选择时间', trigger: 'change' }]
+          }
+        }
+      },
+      created() {
+        this.init()
+      },
+      methods: {
+        async init() {
+          const params = {
+            page: this.page,
+            pageSize: this.pageSize,
+            name: this.input ? this.input : undefined
+          }
+          const res = await getCouponPage(params)
+          if (res.code === 1) {
+            this.tableData = res.data.records
+            this.counts = Number(res.data.total)
+          }
+        },
+        handleQuery() {
+          this.page = 1
+          this.init()
+        },
+        handleAdd() {
+          this.dialogTitle = '新增优惠券'
+          this.form = { name: '', type: 1, amount: '', minSpend: '', dateRange: [], status: 1 }
+          this.dialogVisible = true
+        },
+        handleStatus(row) {
+          const newStatus = row.status === 1 ? 0 : 1
+          const actionText = newStatus === 1 ? '启用' : '停用'
+
+          this.$confirm(`确认要${actionText}该优惠券吗?`, '提示', {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }).then(() => {
+            // 调用 API (注意：这里调用的是下面第二步定义的接口)
+            couponStatus({ id: row.id, status: newStatus }).then(res => {
+              if (res.code === 1) {
+                this.$message.success(`优惠券已${actionText}`)
+                this.init() // 刷新列表
+              } else {
+                this.$message.error(res.msg || '操作失败')
+              }
+            })
+          })
+        },
+        handleEdit(row) {
+          this.dialogTitle = '修改优惠券'
+          this.form = { ...row }
+          // 回显时间
+          if(row.startTime && row.endTime){
+             this.$set(this.form, 'dateRange', [row.startTime, row.endTime])
+          }
+          this.dialogVisible = true
+        },
+        handleDelete(id) {
+          this.$confirm('确认删除该优惠券?', '提示', { type: 'warning' }).then(() => {
+            deleteCoupon(id).then(res => {
+              if (res.code === 1) {
+                this.$message.success('删除成功')
+                this.init()
+              }
+            })
+          })
+        },
+        submitForm() {
+          this.$refs.form.validate((valid) => {
+            if (valid) {
+              // 处理时间数据
+              const params = { ...this.form }
+              if(this.form.dateRange && this.form.dateRange.length === 2){
+                  params.startTime = this.form.dateRange[0]
+                  params.endTime = this.form.dateRange[1]
+              }
+
+              const request = this.form.id ? editCoupon : addCoupon
+              request(params).then(res => {
+                if (res.code === 1) {
+                  this.$message.success('操作成功')
+                  this.dialogVisible = false
+                  this.init()
+                } else {
+                  this.$message.error(res.msg)
+                }
+              })
+            }
+          })
+        },
+        handleClose() {
+          this.dialogVisible = false
+        },
+        handleSizeChange(val) {
+          this.pageSize = val
+          this.init()
+        },
+        handleCurrentChange(val) {
+          this.page = val
+          this.init()
+        },
+        handleDistribute(id) {
+          this.$confirm('此操作将把该优惠券分发给所有用户, 是否继续?', '提示', {
+            confirmButtonText: '确定',
+            cancelButtonText: '取消',
+            type: 'warning'
+          }).then(() => {
+            // === 用户点了确定，开始执行这里 ===
+
+            // 调用接口
+            distributeCouponApi({ couponId: id }).then(res => {
+              // 🛑 重点排查区域：这里面的代码如果有错，就会跳到 catch
+              console.log('接口返回的数据:', res);
+
+              // 瑞吉外卖通常返回 res.code === 1
+              if (String(res.code) === '1') {
+                this.$message.success('分发成功！');
+              } else {
+                this.$message.error(res.msg || '分发失败');
+              }
+            }).catch(err => {
+              // ⚠️ 这里的 catch 专门捕获接口请求失败，或者上面 .then 里的代码报错
+              console.error('❌ 发生严重错误:', err); // 在控制台打印红字
+              this.$message.error('程序出错了，请看控制台红字');
+            });
+
+          }).catch((err) => {
+            // === 这里的 catch 专门捕获“点击取消” ===
+            if (err === 'cancel') {
+              this.$message.info('已取消分发');
+            }
+          });
+        }
+      }
+    })
+</script>
+</body>
+</html>

@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0,user-scalable=no,minimal-ui">
+    <title>菩提阁</title>
+    <link rel="icon" href="./../images/favico.ico">
+    <script src="./../js/base.js"></script>
+    <link rel="stylesheet" href="../../backend/plugins/element-ui/index.css" />
+    <link rel="stylesheet" href="../styles/vant.min.css"/>
+    <link rel="stylesheet" href="../styles/index.css" />
+    <link rel="stylesheet" href="./../styles/add-order.css" />
+</head>
+<body>
+<div id="add_order" class="app">
+    <div class="divHead">
+        <div class="divTitle">
+            <i class="el-icon-arrow-left" @click="goBack"></i>菩提阁
+        </div>
+    </div>
+    <div class="divContent">
+        <div class="divAddress">
+            <div @click="toAddressPage">
+                <div class="address">{{address.detail}}</div>
+                <div class="name">
+                    <span>{{address.consignee}}{{address.sex === '1' ? '先生':'女士'}}</span>
+                    <span>{{address.phone}}</span>
+                </div>
+                <i class="el-icon-arrow-right"></i>
+            </div>
+            <div class="divSplit"></div>
+            <div class="divFinishTime">预计{{finishTime}}送达</div>
+        </div>
+        <div class="order">
+            <div class="title">订单明细</div>
+            <div class="divSplit"></div>
+            <div class="itemList">
+                <div class="item" v-for="(item,index) in cartData" :key="index">
+                    <el-image :src="imgPathConvert(item.image)">
+                        <div slot="error" class="image-slot">
+                            <img src="./../images/noImg.png"/>
+                        </div>
+                    </el-image>
+                    <div class="desc">
+                        <div class="name">{{item.name}}</div>
+                        <div class="numPrice">
+                            <span class="num">x{{item.number}}</span>
+                            <div class="price">
+                                <span class="spanMoney">￥</span>{{item.amount}}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="divAddress" style="margin-top: 10px; margin-bottom: 0;" @click="showCouponPopup = true">
+            <div class="address" style="font-weight: bold;">优惠券</div>
+            <div class="name" style="color: #ff5339; font-weight: bold;">
+                {{ selectedCoupon.id ? (selectedCoupon.type === 1 ? '-￥'+selectedCoupon.amount : selectedCoupon.amount+'折') : '请选择优惠券' }}
+            </div>
+            <i class="el-icon-arrow-right"></i>
+        </div>
+
+        <div class="note">
+            <div class="title">备注</div>
+            <van-field
+                    v-model="note"
+                    rows="2"
+                    autosize
+                    type="textarea"
+                    maxlength="50"
+                    placeholder="请输入您需要备注的信息"
+                    show-word-limit
+            />
+        </div>
+
+        <van-popup v-model="showCouponPopup" position="bottom" :style="{ height: '40%' }">
+            <div style="text-align: center; padding: 10px; font-weight: bold; border-bottom: 1px solid #eee;">选择优惠券</div>
+            <div style="padding: 10px;">
+                <div @click="selectCoupon(null)" style="padding: 10px; border-bottom: 1px solid #f8f8f8;">
+                    <span style="font-weight: bold;">不使用优惠券</span>
+                </div>
+
+                <div v-for="(item, index) in couponList" :key="index"
+                     @click="selectCoupon(item)"
+                     style="padding: 15px 10px; border-bottom: 1px solid #f8f8f8; display: flex; justify-content: space-between;">
+                    <div>
+                        <div style="font-weight: bold; font-size: 16px;">{{item.name}}</div>
+                        <div style="font-size: 12px; color: #999;">满 {{item.minSpend}} 元可用</div>
+                    </div>
+                    <div style="color: #ff5339; font-weight: bold; font-size: 18px;">
+                        {{ item.type === 1 ? '￥'+item.amount : item.amount+'折' }}
+                    </div>
+                </div>
+
+                <div v-if="couponList.length === 0" style="text-align: center; color: #999; margin-top: 20px;">
+                    暂无可用优惠券
+                </div>
+            </div>
+        </van-popup>
+    </div>
+    <div class="divCart">
+        <div :class="{imgCartActive: cartData && cartData.length > 0, imgCart:!cartData || cartData.length<1}"></div>
+        <div :class="{divGoodsNum:1===1, moreGoods:cartData && cartData.length > 99}" v-if="cartData && cartData.length > 0">{{ goodsNum }}</div>
+        <div class="divNum">
+            <span>￥</span>
+            <span>{{finalPrice}}</span>
+        </div>
+        <div class="divPrice"></div>
+        <div :class="{btnSubmitActive: cartData && cartData.length > 0, btnSubmit:!cartData || cartData.length<1}" @click="goToPaySuccess">去支付</div>
+    </div>
+</div>
+<script src="../../backend/plugins/vue/vue.js"></script>
+<script src="../../backend/plugins/element-ui/index.js"></script>
+<script src="./../js/vant.min.js"></script>
+<script src="./../api/address.js"></script>
+<script src="../../backend/plugins/axios/axios.min.js"></script>
+<script src="./../js/request.js"></script>
+<script src="./../js/common.js"></script>
+<script src="./../api/main.js"></script>
+<script src="./../api/order.js"></script>
+<script>
+    new Vue({
+        el:"#add_order",
+        data(){
+            return {
+                address:{
+                    phone:'',//手机号
+                    consignee:'',//姓名
+                    detail:'',//详细地址
+                    sex:'1',
+                    id:undefined
+                },
+                finishTime:'',//送达时间
+                cartData:[],
+                note:'',//备注信息 // 修复：这里加了逗号
+
+                // 【新增】优惠券相关数据
+                showCouponPopup: false, // 控制弹窗显示
+                couponList: [],         // 优惠券列表
+                selectedCoupon: {}      // 当前选中的优惠券对象
+            }
+        },
+        computed:{
+            goodsNum(){
+                let num = 0
+                this.cartData.forEach(item=>{
+                    num += item.number
+                })
+                if(num <99){
+                    return num
+                }else{
+                    return '99+'
+                }
+            },
+            goodsPrice(){
+                let price = 0
+                this.cartData.forEach(item=>{
+                    price += (item.number * item.amount)
+                })
+                return price
+            },
+            // 修复：finalPrice 必须放在 computed 对象内部
+            finalPrice() {
+                let price = this.goodsPrice
+                if (this.selectedCoupon && this.selectedCoupon.id) {
+                    // 如果是满减券 (type=1)
+                    if (this.selectedCoupon.type === 1) {
+                        price = price - this.selectedCoupon.amount
+                    }
+                    // 如果是折扣券 (type=2) 可选实现
+                    // else { price = price * (this.selectedCoupon.amount / 10) }
+                }
+                return price < 0 ? 0 : price.toFixed(2) // 也就是防止负数
+            }
+        },
+        created(){
+            this.initData()
+        },
+        mounted(){},
+        methods:{
+            goBack(){
+                history.go(-1)
+            },
+            initData(){
+                //获取默认的地址
+                this.defaultAddress()
+                //获取购物车的商品
+                this.getCartData()
+                // 【新增】加载优惠券
+                this.getCouponList()
+            },
+
+            // 【新增】获取优惠券列表
+            async getCouponList() {
+                const res = await couponListApi()
+                if(res.code === 1){
+                   this.couponList = res.data
+                }
+            },
+
+            // 【新增】选中优惠券
+            selectCoupon(item) {
+                if (item) {
+                    // 校验门槛
+                    if (this.goodsPrice < item.minSpend) {
+                        this.$notify({ type: 'warning', message: `未满足满减门槛 (需满${item.minSpend}元)` });
+                        return;
+                    }
+                    this.selectedCoupon = item;
+                } else {
+                    this.selectedCoupon = {}; // 不使用
+                }
+                this.showCouponPopup = false; // 关闭弹窗
+            },
+
+            //获取默认地址
+            async defaultAddress(){
+                const res = await  getDefaultAddressApi()
+                if(res.code === 1){
+                   this.address = res.data
+                   this.getFinishTime()
+                }else{
+                    window.requestAnimationFrame(()=>{
+                        window.location.href = '/front/page/address-edit.html'
+                    })
+                }
+            },
+            //获取送达时间
+            getFinishTime(){
+                let now = new Date()
+                let hour = now.getHours() +1
+                let minute = now.getMinutes()
+                if(hour.toString().length <2){
+                    hour = '0' + hour
+                }
+                if(minute.toString().length <2){
+                    minute = '0' + minute
+                }
+                this.finishTime = hour + ':' + minute
+            },
+            toAddressPage(){
+                window.requestAnimationFrame(()=>{
+                    window.location.href = '/front/page/address.html'
+                })
+            },
+            //获取购物车数据
+            async getCartData(){
+                const res = await cartListApi({})
+                if(res.code === 1){
+                    this.cartData = res.data
+                }else{
+                    this.$notify({ type:'warning', message:res.msg});
+                }
+            },
+            // 修复：只保留这一个带优惠券逻辑的提交方法，删除了重复的那个
+            async goToPaySuccess(){
+                const params = {
+                    remark: this.note,
+                    payMethod: 1,
+                    addressBookId: this.address.id,
+                    // 【新增】传给后端 优惠券ID
+                    couponId: this.selectedCoupon.id
+                }
+                const res = await addOrderApi(params)
+                if (res.code === 1) {
+                    window.requestAnimationFrame(() => {
+                        window.location.replace('/front/page/pay-success.html')
+                    })
+                } else {
+                    this.$notify({ type: 'warning', message: res.msg });
+                }
+            },
+            //网络图片路径转换
+            imgPathConvert(path){
+                return imgPath(path)
+            },
+        }
+    })
+</script>
+</body>
+</html>

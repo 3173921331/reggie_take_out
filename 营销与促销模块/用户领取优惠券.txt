@@ -1,0 +1,20 @@
+Function ReceiveCoupon(userId, couponDefId):
+
+    // 1. 检查优惠券库存 (是否发完)
+    couponDef = FindCoupon(couponDefId)
+    if couponDef.total_count <= 0:
+        Return "已抢光"
+
+    // 2. 检查用户是否已领过 (如果限制每人一张)
+    exist = CountUserCoupon(userId, couponDefId)
+    if exist > 0:
+        Return "您已领取过该券"
+
+    // 3. 发放逻辑 (事务操作)
+    BeginTransaction:
+        DecrementCouponStock(couponDefId) // 库存-1
+        InsertUserCoupon(userId, couponDefId, status=0) // 插入记录
+    CommitTransaction
+
+    Return "领取成功"
+End Function

@@ -1,0 +1,81 @@
+// 功能：计算订单最终价格
+// 输入：用户ID (userId), 购物车商品列表 (cartItems), 用户选择的优惠券ID (selectedCouponId)
+// 输出：最终应付金额 (finalAmount), 优惠明细 (discountDetail)
+
+Function CalculateFinalOrderPrice(userId, cartItems, selectedCouponId):
+
+    // --- 第 1 步：计算商品总价（处理限时折扣）---
+    variable totalGoodsPrice = 0.0
+
+    FOR item IN cartItems:
+        // 查询该菜品是否有正在进行中的限时折扣
+        variable flashSale = QueryDatabase("SELECT * FROM flash_sale_dish WHERE dish_id = item.dishId AND now() BETWEEN start_time AND end_time AND status = 1")
+
+        IF (flashSale IS NOT NULL AND flashSale.stock > 0):
+            // 命中限时折扣，使用折扣价
+            itemPrice = flashSale.flash_price
+            Log("菜品 ${item.name} 命中限时折扣")
+        ELSE:
+            // 原价
+            itemPrice = item.price
+        END IF
+
+        totalGoodsPrice = totalGoodsPrice + (itemPrice * item.quantity)
+    END FOR
+
+    variable currentPayPrice = totalGoodsPrice
+
+
+    // --- 第 2 步：应用满减活动 (无需用户选择，自动匹配最优) ---
+    // 查询所有开启的满减规则，按门槛从高到低排序
+    variable rules = QueryDatabase("SELECT * FROM full_reduction_rule WHERE status = 1 ORDER BY threshold DESC")
+
+    variable reductionAmount = 0.0
+    FOR rule IN rules:
+        IF (currentPayPrice >= rule.threshold):
+            reductionAmount = rule.reduce
+            BREAK // 这里的逻辑是只享受最高一档的满减
+        END IF
+    END FOR
+
+    currentPayPrice = currentPayPrice - reductionAmount
+
+
+    // --- 第 3 步：应用优惠券 ---
+    variable couponAmount = 0.0
+
+    IF (selectedCouponId IS NOT NULL):
+        // 校验优惠券合法性
+        variable userCoupon = QueryDatabase("SELECT * FROM user_coupon WHERE id = selectedCouponId AND user_id = userId AND status = 0")
+        variable couponDef = QueryDatabase("SELECT * FROM coupon_definition WHERE id = userCoupon.coupon_id")
+
+        // 校验：是否过期？是否满足门槛？
+        IF (couponDef.end_time < now()):
+            ThrowException("优惠券已过期")
+        ELSE IF (currentPayPrice < couponDef.min_spend):
+            ThrowException("未满足优惠券使用门槛")
+        ELSE:
+            couponAmount = couponDef.amount
+        END IF
+    END IF
+
+    currentPayPrice = currentPayPrice - couponAmount
+
+
+    // --- 第 4 步：防止金额为负数 ---
+    IF (currentPayPrice < 0):
+        currentPayPrice = 0
+    END IF
+
+    // --- 返回结果 ---
+    RETURN {
+        "originalPrice": totalGoodsPrice,
+        "finalPrice": currentPayPrice,
+        "breakdown": {
+            "fullReduction": reductionAmount,
+            "couponDiscount": couponAmount,
+            "flashSaleApplied": true/false
+        }
+    }
+
+End Function

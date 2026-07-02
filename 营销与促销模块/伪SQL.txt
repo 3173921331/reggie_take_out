@@ -1,0 +1,41 @@
+-- 1. 优惠券定义表 (管理端配置)
+TABLE coupon_definition {
+    id: Long              // 主键
+    name: String          // 优惠券名称 (如"新用户专享")
+    type: Integer         // 类型 (1:满减券, 2:无门槛券)
+    amount: Decimal       // 优惠金额 (如 5元)
+    min_spend: Decimal    // 最低消费门槛 (如 20元)
+    start_time: DateTime  // 有效期开始
+    end_time: DateTime    // 有效期结束
+    total_count: Integer  // 发放总量
+    status: Integer       // 状态 (0:停用, 1:启用)
+}
+
+-- 2. 用户优惠券表 (记录用户领取和使用情况)
+TABLE user_coupon {
+    id: Long
+    user_id: Long         // 归属用户
+    coupon_id: Long       // 关联的优惠券定义ID
+    status: Integer       // 状态 (0:未使用, 1:已使用, 2:已过期)
+    order_id: Long        // 使用于哪个订单
+    get_time: DateTime    // 领取时间
+}
+
+-- 3. 满减活动配置表
+TABLE full_reduction_rule {
+    id: Long
+    threshold: Decimal    // 满多少 (如 100)
+    reduce: Decimal       // 减多少 (如 20)
+    status: Integer       // 开启状态
+}
+
+-- 4. 限时折扣商品表
+TABLE flash_sale_dish {
+    id: Long
+    dish_id: Long         // 关联菜品ID
+    flash_price: Decimal  // 秒杀价/折扣价
+    stock: Integer        // 活动库存
+    start_time: DateTime  // 活动开始时间
+    end_time: DateTime    // 活动结束时间
+    status: Integer
+}
