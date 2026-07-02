@@ -44,4 +44,15 @@ public class GlobalExceptionHandler {
         return R.error(ex.getMessage());
     }
 
+    /**
+     * 通用异常处理，捕获所有未处理的异常
+     * @param ex
+     * @return
+     */
+    @ExceptionHandler(Exception.class)
+    public R<String> exceptionHandler(Exception ex){
+        log.error("系统异常：", ex);
+        return R.error("系统异常：" + ex.getMessage());
+    }
+
 }

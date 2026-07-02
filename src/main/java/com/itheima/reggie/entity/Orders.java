@@ -59,6 +59,6 @@ public class Orders implements Serializable {
     //收货人
     private String consignee;
 
-    // --- 【新增】优惠券ID ---
-    private Long couponId;
+    // --- 【新增】用户优惠券ID ---
+    private Long userCouponId;
 }

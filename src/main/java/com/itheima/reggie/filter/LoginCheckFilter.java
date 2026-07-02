@@ -39,7 +39,8 @@ public class LoginCheckFilter implements Filter{
                 "/front/**",
                 "/common/**",
                 "/user/sendMsg",
-                "/user/login"
+                "/user/login",
+                "/recommend/list"   // 猜你喜欢接口放行，未登录时返回热销菜品
         };
 
         //2、判断本次请求是否需要处理

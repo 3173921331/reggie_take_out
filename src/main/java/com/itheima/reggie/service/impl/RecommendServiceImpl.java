@@ -61,40 +61,43 @@ public class RecommendServiceImpl implements RecommendService {
         Set<Long> selectedIds = new HashSet<>();
 
         // ==========================================
-        // 1. 历史记录优先 (个性化)
+        // 1. 历史记录优先 (个性化) - 仅登录用户有
         // ==========================================
-        // 查询当前用户最近100条已完成的订单
-        List<Orders> historyOrders = orderService.lambdaQuery()
-                .eq(Orders::getUserId, userId)
-                .eq(Orders::getStatus, 4) // 4代表已完成
-                .orderByDesc(Orders::getOrderTime)
-                .last("limit 100")
-                .list();
-
-        if (!historyOrders.isEmpty()) {
-            List<Long> orderIds = historyOrders.stream().map(Orders::getId).collect(Collectors.toList());
-            // 获取这些订单里的菜品
-            List<OrderDetail> details = orderDetailService.lambdaQuery()
-                    .in(OrderDetail::getOrderId, orderIds)
+        if (userId != null) {
+            // 查询当前用户最近100条已完成的订单
+            List<Orders> historyOrders = orderService.lambdaQuery()
+                    .eq(Orders::getUserId, userId)
+                    .eq(Orders::getStatus, 4) // 4代表已完成
+                    .orderByDesc(Orders::getOrderTime)
+                    .last("limit 100")
                     .list();
 
-            // 统计购买频次最高的5个菜品ID
-            List<Long> favoriteIds = details.stream()
-                    .collect(Collectors.groupingBy(OrderDetail::getDishId, Collectors.counting()))
-                    .entrySet().stream()
-                    .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
-                    .limit(5)
-                    .map(Map.Entry::getKey)
-                    .collect(Collectors.toList());
-
-            if (!favoriteIds.isEmpty()) {
-                // 查询具体的菜品对象（必须是起售状态）
-                List<Dish> favorites = dishService.lambdaQuery()
-                        .in(Dish::getId, favoriteIds)
-                        .eq(Dish::getStatus, 1)
+            if (!historyOrders.isEmpty()) {
+                List<Long> orderIds = historyOrders.stream().map(Orders::getId).collect(Collectors.toList());
+                // 获取这些订单里的菜品
+                List<OrderDetail> details = orderDetailService.lambdaQuery()
+                        .in(OrderDetail::getOrderId, orderIds)
                         .list();
-                recommendDishes.addAll(favorites);
-                favorites.forEach(d -> selectedIds.add(d.getId()));
+
+                // 统计购买频次最高的5个菜品ID（过滤掉套餐，只统计菜品）
+                List<Long> favoriteIds = details.stream()
+                        .filter(d -> d.getDishId() != null) // 过滤掉dishId为null的套餐记录
+                        .collect(Collectors.groupingBy(OrderDetail::getDishId, Collectors.counting()))
+                        .entrySet().stream()
+                        .sorted(Map.Entry.<Long, Long>comparingByValue().reversed())
+                        .limit(5)
+                        .map(Map.Entry::getKey)
+                        .collect(Collectors.toList());
+
+                if (!favoriteIds.isEmpty()) {
+                    // 查询具体的菜品对象（必须是起售状态）
+                    List<Dish> favorites = dishService.lambdaQuery()
+                            .in(Dish::getId, favoriteIds)
+                            .eq(Dish::getStatus, 1)
+                            .list();
+                    recommendDishes.addAll(favorites);
+                    favorites.forEach(d -> selectedIds.add(d.getId()));
+                }
             }
         }
 
@@ -117,10 +120,11 @@ public class RecommendServiceImpl implements RecommendService {
                         .map(Orders::getId)
                         .collect(Collectors.toList());
 
-                // 2.2 统计 已完成订单 中的热销菜品
+                // 2.2 统计 已完成订单 中的热销菜品（只统计菜品，排除套餐）
                 QueryWrapper<OrderDetail> hotQuery = new QueryWrapper<>();
                 hotQuery.select("dish_id", "sum(number) as totalCount") // 建议用sum(number)统计真实份数而非行数
                         .in("order_id", completedOrderIds) // 将统计范围限制在已完成订单内
+                        .isNotNull("dish_id") // 排除套餐记录，只统计菜品
                         .groupBy("dish_id")
                         .orderByDesc("totalCount")
                         .notIn(!selectedIds.isEmpty(), "dish_id", selectedIds)

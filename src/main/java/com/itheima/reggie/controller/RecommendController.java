@@ -14,7 +14,7 @@ import java.util.List;
 
 /**
  * 智能推荐 Controller
- * 处理与“猜你喜欢”功能相关的前端请求。
+ * 处理与"猜你喜欢"功能相关的前端请求。
  * 基础请求路径：/recommend
  */
 @RestController
@@ -26,15 +26,15 @@ public class RecommendController {
     private RecommendService recommendService;
 
     /**
-     * 获取“猜你喜欢”菜品列表
+     * 获取"猜你喜欢"菜品列表
      * 请求路径: GET /recommend/list
      * 场景说明: 用户在移动端首页浏览时，展示基于其历史偏好的推荐菜品。
+     * 优化：未登录时也能返回全站热销菜品，提升用户体验
      * @return R<List<DishDto>> 统一返回结果，data字段包含封装好的菜品DTO列表（含口味、分类名）
      */
     @GetMapping("/list")
     public R<List<DishDto>> list() {
-        // 获取当前登录用户的ID
-        // 因为经过了 LoginCheckFilter 拦截器，此时 ThreadLocal 中一定有值。
+        // 获取当前登录用户的ID（可能为null，未登录状态）
         Long currentId = BaseContext.getCurrentId();
 
         log.info("用户 {} 请求智能推荐菜品...", currentId);

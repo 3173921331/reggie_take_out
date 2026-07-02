@@ -67,7 +67,7 @@ public class OrderServiceImpl extends ServiceImpl<OrdersMapper, Orders> implemen
         // 3. 查询用户 (防止空指针)
         User user = userMapper.selectById(userId);
         if(user == null){
-            throw new CustomException("用户信息异常");
+            throw new CustomException("用户信息异常，请重新登录");
         }
 
         // 4. 查询地址
@@ -105,7 +105,7 @@ public class OrderServiceImpl extends ServiceImpl<OrdersMapper, Orders> implemen
         BigDecimal finalAmount = originalAmount;
 
         // 5. 优惠券逻辑
-        Long userCouponId = orders.getCouponId();
+        Long userCouponId = orders.getUserCouponId();
         if (userCouponId != null) {
             UserCoupon userCoupon = userCouponService.getById(userCouponId);
             if (userCoupon != null && userCoupon.getStatus() == 0) {

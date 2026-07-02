@@ -48,10 +48,6 @@ public class Dish implements Serializable {
     private Integer status;
 
 
-    //库存
-    private Integer stock;
-
-
     //顺序
     private Integer sort;
 

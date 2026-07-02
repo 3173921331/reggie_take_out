@@ -260,8 +260,8 @@
                     remark: this.note,
                     payMethod: 1,
                     addressBookId: this.address.id,
-                    // 【新增】传给后端 优惠券ID
-                    couponId: this.selectedCoupon.id
+                    // 【新增】传给后端 用户优惠券ID
+                    userCouponId: this.selectedCoupon.id
                 }
                 const res = await addOrderApi(params)
                 if (res.code === 1) {
