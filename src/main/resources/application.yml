@@ -19,4 +19,4 @@ mybatis-plus:
     db-config:
       id-type: ASSIGN_ID
 reggie:
-  path: C:\Users\wdt\Desktop\t\javase\24软工2叶伊杰2023025643426实训报告\reggie-take-out\reggie_take_out\img\
+  path: D\img\
